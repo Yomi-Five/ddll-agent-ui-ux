@@ -1,0 +1,3 @@
+interface:
+  display_name: "DDLL-Agent-UI/UX"
+  short_description: "通用 UI/UX 设计执行规范，覆盖 Figma、组件、表格与设计验收"
