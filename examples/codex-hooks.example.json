@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|compact|fork|clear)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/absolute/path/to/python3\" \"/absolute/path/to/ddll-agent-ui-ux/scripts/design_resume.py\"",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/absolute/path/to/python3\" \"/absolute/path/to/ddll-agent-ui-ux/scripts/design_resume.py\"",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^mcp__figma(?:_console)?__",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/absolute/path/to/python3\" \"/absolute/path/to/ddll-agent-ui-ux/scripts/design_resume.py\"",
+            "timeout": 5,
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

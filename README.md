@@ -6,10 +6,13 @@
 
 本仓库以设计工作流和规则为主。技能入口是 [SKILL.md](SKILL.md)，本说明用于帮助使用者理解能力、准备资料和发起任务；实际执行以技能主文件、本轮适用引用及用户有效要求为依据。
 
+当前结构采用「每轮短入口＋按操作加载细则」，配套可选的 Codex 恢复 Hooks，处理会话恢复、上下文压缩和仅输入「继续」时的规则加载。图标按「所属组件库优先，确认缺失后在线补齐」执行，并以实际显示效果核一致性。
+
 ## 目录
 
 - [适用场景](#适用场景)
 - [安装与调用](#安装与调用)
+- [Codex Hooks 接入](#codex-hooks-接入)
 - [工具与资料准备](#工具与资料准备)
 - [如何描述任务](#如何描述任务)
 - [来源分工与修改边界](#来源分工与修改边界)
@@ -17,7 +20,7 @@
 - [完整执行流程](#完整执行流程)
 - [表格与筛选专项规范](#表格与筛选专项规范)
 - [组件库与动效专项规范](#组件库与动效专项规范)
-- [按复杂度组织协作](#按复杂度组织协作)
+- [单 agent 执行](#单-agent-执行)
 - [验收与交付](#验收与交付)
 - [目录结构与阅读导航](#目录结构与阅读导航)
 - [能力边界与常见问题](#能力边界与常见问题)
@@ -54,7 +57,7 @@ git clone https://github.com/Yomi-Five/ddll-agent-ui-ux.git \
 
 如果只希望当前项目使用，将完整仓库放在该项目的 `.agents/skills/ddll-agent-ui-ux` 下。已有其他有效技能目录或软链接的环境可继续使用原有安装方式，本说明不要求迁移现有配置。
 
-必须保留 `SKILL.md`、`agents/`、`references/`、`taste.md` 和 `inbox.md` 的相对位置。只复制主文件会丢失按场景加载的细则。
+必须保留 `SKILL.md`、`agents/`、`references/`、`scripts/`、`examples/`、`taste.md` 和 `inbox.md` 的相对位置。只复制主文件会丢失按场景加载的细则及恢复脚本。
 
 对于通过 `git clone` 安装、且没有需要保留的本地修改的副本，可在确认工作区状态后更新：
 
@@ -79,9 +82,29 @@ $ddll-agent-ui-ux
 
 当前配置未关闭隐式调用，宿主可根据技能描述和任务语义选择它。匹配依据涉及设计、Figma、UI、组件库、排版、配色、动效、图标、插画及设计评审；并非出现某个词就保证触发。
 
-技能采用渐进加载：先暴露名称与描述，被选中后读取 `SKILL.md`，再按任务读取相关引用。正常设计任务不需要每次通读全部参考文件。
+技能采用渐进加载：每轮新设计、改字、内容替换、布局调整、纠错、续做或评审，执行前重新读取短入口 `SKILL.md`，按本轮操作及实际影响读取命中规则。引用原文仍在有效上下文且未变化时同轮复用；上下文压缩后原文缺失、规则更新或范围变化时补读，不以摘要代替必要原始来源。局部修改不机械加载完整新需求流程，改字影响换行等情况仍须补读布局规则。
+
+需要每轮设计必读时，在宿主的全局指令中声明，避免仅依赖语义自动匹配；例如：
+
+```text
+每轮涉及设计、新建或修改设计内容、纠错、续做及设计评审时，执行前必须读取 ddll-agent-ui-ux 的 SKILL.md，并按入口路由读取适用章节。同轮连续操作复用仍有效的引用原文；后续新一轮修改重新读取入口。
+```
+
+入口只保留核心约束及路由。详细流程、内容保护、共同设计细则与技能维护分别存放在对应引用中；正常任务不默认通读全部引用或本 README。
+
+需要断线或压缩后的自动加载时，按[设计会话自动恢复](references/session-recovery.md)登记当前聊天及已有任务记录，并在宿主中合并恢复 Hooks。可信 Hook 完整注入短入口即视为本轮已读；同轮去重、不同聊天隔离，完成／取消后更新状态。脚本验证不代表宿主已触发，新增 Hook 仍须由用户审核信任。
 
 Codex 会检测技能变化；若更新未出现，可重启后检查技能列表。不要以“文件已放入目录”代替实际可发现、可调用的确认。
+
+## Codex Hooks 接入
+
+这里与 GPT 配合的是 **Codex 宿主 Hook**：宿主在特定事件运行 [design_resume.py](scripts/design_resume.py)，将最新短入口完整交给当前模型。它不适用于普通 ChatGPT 网页聊天，也不是 OpenAI API Webhook；安装技能本身不会自动启用 Hook。
+
+完整操作见[GPT 与 Codex Hooks 接入说明](references/codex-hooks-setup.md)，可复制配置见 [codex-hooks.example.json](examples/codex-hooks.example.json)。说明包含 Python 与路径准备、三个事件的 JSON 配置、保留已有处理器的合并方式、审核信任、全局 `AGENTS.md`、任务登记／结束和真实恢复验证。
+
+三个事件分工：`SessionStart` 负责已登记聊天的启动／恢复／压缩，`UserPromptSubmit` 负责新一轮输入，`PostToolUse` 在实际 Figma 调用后补充登记。首次设计前仍须读取技能并关联原任务记录；不要只依赖工具调用后的补登。用户只说「继续」时按聊天状态加载，完成／取消／切换无关任务时及时更新状态。
+
+可信 Hook 完整注入入口后不重复读取同一入口，细则仍按路由加载。宿主实际触发、规则完整送达与恢复接续须分别核实；单测通过或配置文件存在不代表已经生效。当前脚本适用于 macOS／Linux，详见[官方 Hooks 文档](https://learn.chatgpt.com/docs/hooks)。
 
 ## 工具与资料准备
 
@@ -314,6 +337,12 @@ Codex 会检测技能变化；若更新未出现，可重启后检查技能列�
 
 授权创建或整理组件规范展示时，组件内容、组名、弧形分组括号、行列标注和完整边界分别检查。适用的格子留白、Regular 标注及组间排布，见 [组件规范](references/component-spec-rules.md)，不据此重排无关组件集。
 
+### 图标先查组件库，再从在线网站补缺
+
+新增或替换图标时，先从当前界面实际所属组件库调取，保留实例关联；查真实目录、同义词和现有实例来源后再判缺失。确认没有合适图标后，从在线图标网站调取，优先现有家族的官方站点、同套资源及可编辑 SVG。
+
+与现行同用途图标对照线性／面性、线宽、网格与尺寸、圆角、视觉重量、颜色和光学居中，按相同显示尺寸核本机渲染，不逐个混搭或用 emoji 替代。外部来源记入原任务记录；共享库写入与发布仍按授权处理。详见[图标来源与一致性](references/component-spec-rules.md#图标来源与一致性)。
+
 ### 动效有独立验证条件
 
 使用 Figma 原生 Motion 时间轴和关键帧，静态 UI 保持组件关联，由普通效果层承载适用运动。交付需区分已编辑时间轴、已实际播放及真实功能运行；一个视觉演示不能证明麦克风、网络状态或其他业务逻辑已经实现。
@@ -346,12 +375,23 @@ Codex 会检测技能变化；若更新未出现，可重启后检查技能列�
 ```text
 ddll-agent-ui-ux/
 ├── README.md                              # 中文使用说明
-├── SKILL.md                               # 技能入口、主流程与共同约束
+├── SKILL.md                               # 每轮必读的核心约束与按需路由
 ├── taste.md                               # 无更强来源时的视觉品味
 ├── inbox.md                               # 尚未稳定的通用想法
+├── scripts/
+│   ├── design_resume.py                   # 聊天状态与恢复 Hook
+│   └── test_design_resume.py              # 恢复机制回归测试
+├── examples/
+│   └── codex-hooks.example.json           # 三个恢复 Hook 的可移植配置模板
 ├── agents/
 │   └── openai.yaml                        # 技能显示名称与简短描述
 └── references/
+    ├── content-preservation.md
+    ├── design-workflow.md
+    ├── common-design-rules.md
+    ├── skill-maintenance.md
+    ├── session-recovery.md
+    ├── codex-hooks-setup.md
     ├── multi-agent-workflow.md
     ├── figma-map.md
     ├── figma-rescan.md
@@ -376,7 +416,14 @@ ddll-agent-ui-ux/
 
 | 文件 | 何时阅读 |
 |---|---|
-| [SKILL.md](SKILL.md) | 技能启用后先读；确定范围、来源、主流程和共同约束 |
+| [SKILL.md](SKILL.md) | 每轮设计或改稿执行前必读；核心约束及按需路由 |
+| [content-preservation.md](references/content-preservation.md) | 旧稿增量、改字、内容替换及来源冲突时读 |
+| [design-workflow.md](references/design-workflow.md) | 新需求、新流程及整页设计；局部任务仅取实际涉及阶段 |
+| [common-design-rules.md](references/common-design-rules.md) | 新建对象、组件／变量、布局／样式、状态、标注或动效的对应章节 |
+| [skill-maintenance.md](references/skill-maintenance.md) | 收录、整理或优化技能时读 |
+| [session-recovery.md](references/session-recovery.md) | 设计任务首次登记、断线／压缩恢复及完成／取消时读 |
+| [codex-hooks-setup.md](references/codex-hooks-setup.md) | 首次安装、配置、验证或排查 Codex 恢复 Hooks 时读 |
+| [codex-hooks.example.json](examples/codex-hooks.example.json) | 合并三个恢复 Hook；先替换本机解释器与脚本绝对路径 |
 | [multi-agent-workflow.md](references/multi-agent-workflow.md) | 轻量执行、角色分工、工具占用、返修与中断恢复 |
 | [figma-map.md](references/figma-map.md) | 查来源、核适用版本、确认编辑落点 |
 | [figma-rescan.md](references/figma-rescan.md) | 当前资料或索引失效，需要按需刷新定位 |
@@ -388,7 +435,7 @@ ddll-agent-ui-ux/
 | [table-design-rules.md](references/table-design-rules.md) | 表格结构、固定要求、样式、汇总、分页和交互依据 |
 | [table-creation-workflow.md](references/table-creation-workflow.md) | 新建、恢复、合并与批量修正表格的具体执行 |
 | [tables-filters.md](references/tables-filters.md) | 筛选 label、布局、尾部操作与控件装配 |
-| [component-spec-rules.md](references/component-spec-rules.md) | 母组件、属性、变体、状态、展示格子与图标补库 |
+| [component-spec-rules.md](references/component-spec-rules.md) | 母组件、属性、变体、状态、展示格子、图标来源与一致性及补库 |
 | [official-component-reproduction.md](references/official-component-reproduction.md) | 对照官方 live／源码复刻组件并核验来源 |
 | [restoration-migration.md](references/restoration-migration.md) | 还原、跨文件迁移、定稿回迁和依赖保护 |
 | [live-alignment-verification.md](references/live-alignment-verification.md) | 与线上或指定现行界面对齐，区分观察与验证 |
@@ -414,6 +461,10 @@ ddll-agent-ui-ux/
 ### 没有组件或变量时能否临时画一个？
 
 先核实际所属库、远程绑定和现有依赖。仍缺失时说明具体能力缺口与影响，不能静默打散、伪造关联、造变量，或将自行拼装称为规范库复用；新增能力需按本轮授权边界处理。
+
+### 组件库没有所需图标时怎么办？
+
+确认所属库及其实际目录中没有合适图标后，从在线图标网站取得同家族、同风格资源，优先可编辑 SVG，并与现有图标做显示尺寸和本机渲染对照。在线补缺不等于可以替换无关旧图标或修改整库；具体要求见[图标来源与一致性](references/component-spec-rules.md#图标来源与一致性)。
 
 ### 是否会给每个任务补齐全部异常状态？
 
@@ -441,7 +492,9 @@ ddll-agent-ui-ux/
 
 | 信息 | 放置位置 |
 |---|---|
-| 跨项目主流程、授权与共同约束 | `SKILL.md` |
+| 每轮核心约束与读取路由 | `SKILL.md` |
+| 详细设计流程、内容保护、共同设计细则 | 对应 `references/` 文件 |
+| 收录边界与维护方法 | `references/skill-maintenance.md` |
 | 已稳定的场景规则 | 对应 `references/` 文件 |
 | 无更强来源时的个人视觉偏好 | `taste.md` |
 | 用户明确保留、尚未稳定的通用想法 | `inbox.md` |
