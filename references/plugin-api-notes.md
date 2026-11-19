@@ -23,7 +23,7 @@
 ## 布局
 
 - `resize(w, h)` 会把自动布局尺寸模式重置为 FIXED，之后重新设 `primaryAxisSizingMode` 与 `layoutSizing*`，否则节点塌缩。
-- `layoutSizingHorizontal/Vertical` 的 FILL／HUG 要在 `appendChild` 进自动布局父级**之后**设。
+- `layoutSizingHorizontal/Vertical` 的 FILL／HUG 要在 `appendChild` 进自动布局父级**之后**设。需要撑开剩余宽时，把 FILL 设在真实文案或控件上，**不要创建名为「弹性区域」的空 Frame**。
 - 文本节点没有内边距：外包自动布局框，给框设内边距。
 - `figma.createFrame()` 默认 `clipsContent = true`；无滚动、遮罩等理由时设为 `false`。
 - 头部或底部描边设 `strokesIncludedInLayout = false`，避免 1px 描边把 56 的栏撑成 57。
